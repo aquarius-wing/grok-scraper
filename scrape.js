@@ -127,6 +127,7 @@ async function waitForReply(page, beforeText, {
   ];
 
   let thinkingStart = null;
+  let thinkingLastGrowth = null;  // 最后一次内容增长的时间
 
   while (Date.now() - start < timeoutMs) {
     try {
@@ -163,10 +164,12 @@ async function waitForReply(page, beforeText, {
       if (phase === 'waiting') {
         phase = 'thinking';
         thinkingStart = Date.now();
+        thinkingLastGrowth = Date.now();
         console.log(`📊 ${elapsed}s — [thinking] 内容开始增长 (+${growth}, total ${len})`);
       } else if (phase === 'thinking' || phase === 'replying') {
+        thinkingLastGrowth = Date.now();  // 有增长就刷新
         // 检查新增内容是否已经包含实质性回复
-        if (!isThinkingPhase(newContent) && hasSubstantiveReply(newContent)) {
+        if ((!isThinkingPhase(newContent) && hasSubstantiveReply(newContent)) || len > 2000) {
           if (phase !== 'replying') {
             phase = 'replying';
             replyDetectedAt = Date.now();
@@ -181,9 +184,10 @@ async function waitForReply(page, beforeText, {
     } else {
       stableCount++;
 
-      // thinking 阶段超时检测
-      if (phase === 'thinking' && thinkingStart && (Date.now() - thinkingStart) > thinkingTimeoutMs) {
-        console.log(`📊 ${elapsed}s — ❌ thinking 阶段超时 (${Math.floor((Date.now() - thinkingStart) / 1000)}s)，Grok 可能卡死`);
+      // thinking 阶段超时检测：距上次内容增长超过 thinkingTimeoutMs 才算卡死
+      if (phase === 'thinking' && thinkingLastGrowth && (Date.now() - thinkingLastGrowth) > thinkingTimeoutMs) {
+        const stuckSec = Math.floor((Date.now() - thinkingLastGrowth) / 1000);
+        console.log(`📊 ${elapsed}s — ❌ thinking 阶段 ${stuckSec}s 无增长，Grok 可能卡死`);
         return { ok: false, currentText, newContent, forced: false, error: 'Thinking timeout' };
       }
 
