@@ -109,6 +109,7 @@ async function waitForReply(page, beforeText, {
   pollMs = 3000,
   stableRounds = 5,
   timeoutMs = 240000,
+  thinkingTimeoutMs = 90000,   // thinking 阶段最多等 90s，超出视为卡死
 } = {}) {
   const start = Date.now();
   let lastLen = 0;
@@ -119,15 +120,31 @@ async function waitForReply(page, beforeText, {
 
   // 错误关键词：检测到就立即退出
   const ERROR_SIGNALS = [
-    '出错了，请刷新以重新连接或重试',
+    '出错了，请刷新',
     'Something went wrong',
     'Try again',
     'Reconnect',
   ];
 
+  let thinkingStart = null;
+
   while (Date.now() - start < timeoutMs) {
-    await page.waitForTimeout(pollMs);
-    const currentText = await page.evaluate(() => document.body.innerText);
+    try {
+      await page.waitForTimeout(pollMs);
+    } catch (e) {
+      // 浏览器/页面被关闭时优雅退出
+      console.log(`📊 ⚠️ 页面已关闭: ${e.message}`);
+      return { ok: false, currentText: '', newContent: '', forced: false, error: 'Page closed' };
+    }
+
+    let currentText = '';
+    try {
+      currentText = await page.evaluate(() => document.body.innerText);
+    } catch (e) {
+      console.log(`📊 ⚠️ 无法读取页面内容: ${e.message}`);
+      return { ok: false, currentText: '', newContent: '', forced: false, error: 'Page closed' };
+    }
+
     const len = currentText.length;
     const elapsed = Math.floor((Date.now() - start) / 1000);
     const newContent = getNewContent(beforeText, currentText);
@@ -145,6 +162,7 @@ async function waitForReply(page, beforeText, {
 
       if (phase === 'waiting') {
         phase = 'thinking';
+        thinkingStart = Date.now();
         console.log(`📊 ${elapsed}s — [thinking] 内容开始增长 (+${growth}, total ${len})`);
       } else if (phase === 'thinking' || phase === 'replying') {
         // 检查新增内容是否已经包含实质性回复
@@ -162,6 +180,12 @@ async function waitForReply(page, beforeText, {
       }
     } else {
       stableCount++;
+
+      // thinking 阶段超时检测
+      if (phase === 'thinking' && thinkingStart && (Date.now() - thinkingStart) > thinkingTimeoutMs) {
+        console.log(`📊 ${elapsed}s — ❌ thinking 阶段超时 (${Math.floor((Date.now() - thinkingStart) / 1000)}s)，Grok 可能卡死`);
+        return { ok: false, currentText, newContent, forced: false, error: 'Thinking timeout' };
+      }
 
       if (phase === 'waiting') {
         console.log(`📊 ${elapsed}s — [waiting] 等待回复... (${len})`);
@@ -351,7 +375,9 @@ function cleanReply(newContent, userPrompt) {
     console.error(`║  Elapsed: ${elapsed}s                          ║`);
     console.error('╚══════════════════════════════════════════╝');
     fs.writeFileSync(path.join(OUTPUT_DIR, 'debug-aftertext.txt'), result.currentText || 'empty');
-    process.exit(result.error ? 3 : 1);   // exit 3 = Grok service error (retryable)
+    // exit 3 = Grok service/thinking error (retryable), 1 = timeout (not retried)
+    const retryable = result.error && result.error !== 'Page closed';
+    process.exit(retryable ? 3 : 1);
   }
 
   // 提取并清理回复
