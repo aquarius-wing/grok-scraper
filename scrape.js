@@ -117,12 +117,27 @@ async function waitForReply(page, beforeText, {
   let replyDetectedAt = 0;
   let lastNewContent = '';
 
+  // 错误关键词：检测到就立即退出
+  const ERROR_SIGNALS = [
+    '出错了，请刷新以重新连接或重试',
+    'Something went wrong',
+    'Try again',
+    'Reconnect',
+  ];
+
   while (Date.now() - start < timeoutMs) {
     await page.waitForTimeout(pollMs);
     const currentText = await page.evaluate(() => document.body.innerText);
     const len = currentText.length;
     const elapsed = Math.floor((Date.now() - start) / 1000);
     const newContent = getNewContent(beforeText, currentText);
+
+    // 检测 Grok 网络/服务错误
+    const errorSignal = ERROR_SIGNALS.find(s => currentText.includes(s));
+    if (errorSignal) {
+      console.log(`📊 ${elapsed}s — ❌ 检测到错误提示："${errorSignal}"，提前退出`);
+      return { ok: false, currentText, newContent, forced: false, error: errorSignal };
+    }
 
     if (len > lastLen) {
       stableCount = 0;
@@ -328,13 +343,15 @@ function cleanReply(newContent, userPrompt) {
   console.log(`🔒 浏览器已关闭 (${elapsed}s)`);
 
   if (!result.ok) {
+    const reason = result.error ? `Grok error: ${result.error}` : 'Timeout waiting for reply';
     console.error('');
     console.error('╔══════════════════════════════════════════╗');
-    console.error('║  ❌ FAILED — Timeout waiting for reply    ║');
+    console.error('║  ❌ FAILED                               ║');
+    console.error(`║  ${reason.substring(0, 40).padEnd(40)}║`);
     console.error(`║  Elapsed: ${elapsed}s                          ║`);
     console.error('╚══════════════════════════════════════════╝');
     fs.writeFileSync(path.join(OUTPUT_DIR, 'debug-aftertext.txt'), result.currentText || 'empty');
-    process.exit(1);
+    process.exit(result.error ? 3 : 1);   // exit 3 = Grok service error (retryable)
   }
 
   // 提取并清理回复
