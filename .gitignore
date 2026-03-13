@@ -1,0 +1,5 @@
+node_modules/
+session/
+output/
+*.log
+.DS_Store
