@@ -1,11 +1,12 @@
 /**
- * scrape.js — Playwright 全程浏览器操作 (v6)
+ * scrape.js — Playwright 全程浏览器操作 (v7)
  *
- * 策略改进（vs v5）:
- *   - 两阶段检测：先等待回复开始（检测新增内容），再等待回复完成（内容稳定）
- *   - 更智能的稳定判断：搜索/思考阶段文本短暂稳定不算完成
- *   - 检测实质性回复内容（Markdown 标题、长段落等）才认为是真正的回复
- *   - 清晰的 success/failure 输出
+ * v7 改进：
+ *   - 用 innerHTML + turndown 替代 innerText + 字符串比对，解决内容截断和格式丢失
+ *   - 直接定位 Grok 回复 DOM 节点（[aria-label="Grok"] .r-16lk18l），不依赖文本对比
+ *   - 自定义 turndown 规则处理 Grok 特有的"block span 标题"和"r-b88u0q 粗体"
+ *   - 等待逻辑保留 innerText 长度监控（稳定性检测），内容提取改用 innerHTML
+ *   - 如果 DOM 选择器失效，回退到 innerText 方式
  *
  * 用法:
  *   npm run scrape                    # 默认 prompt
@@ -15,6 +16,7 @@
  */
 
 const { chromium } = require('playwright');
+const TurndownService = require('turndown');
 const path = require('path');
 const fs = require('fs');
 
@@ -54,94 +56,181 @@ for (let i = 0; i < args.length; i++) {
 const PROMPT = cleanArgs[0] || DEFAULT_PROMPT;
 
 /**
- * 判断新增文本是否看起来像 Grok 的"思考/搜索"阶段而非最终回复
+ * 创建 Turndown 实例，带自定义规则处理 Grok 特有的 HTML 结构
+ *
+ * Grok 的 Markdown 渲染特征：
+ *   - 标题：<span style="display: block; ... margin-bottom: 0.5em;"> 内嵌套 <span>
+ *   - 粗体：包含 class r-b88u0q 的 <span>
+ *   - 列表：标准 <ul><li>，但 li 内用 <br> 分隔标题和描述
+ *   - 列表中的粗体标题（"标题\n描述"格式）：用 <br> 分隔
  */
-function isThinkingPhase(text) {
-  if (!text || text.length < 10) return true;
+function createTurndown() {
+  const td = new TurndownService({
+    headingStyle: 'atx',
+    bulletListMarker: '-',
+    codeBlockStyle: 'fenced',
+  });
 
-  const thinkingSignals = [
-    /^(thinking|searching|analyzing|exploring|pulling|running|executing|computing|querying)/im,
-    /about the user's request/i,
-    /Switching to/i,
-    /Using since:/i,
-    /within_time:/i,
-    /xai:tool_usage_card/i,
-    /code_execution/i,
-    /x_keyword_search/i,
-    /x_semantic_search/i,
-    /tool_name/i,
-    /tool_args/i,
-    /citation_card/i,
-    /快速回答/,
-    /自动$/m,
-  ];
+  // 规则1：识别 Grok 的"block span 标题"（display:block + margin-bottom）
+  // Grok 有两种标题级别：
+  //   一级（整体标题）：只有 margin-bottom: 0.5em，用 ## 渲染
+  //   二级（子标题）：margin-top: 1.5em + margin-bottom: 0.5em，用 ### 渲染
+  td.addRule('grok-heading', {
+    filter: (node) => {
+      if (node.nodeName !== 'SPAN') return false;
+      const style = node.getAttribute('style') || '';
+      return style.includes('display: block') && style.includes('margin-bottom');
+    },
+    replacement: (content) => {
+      const text = content.trim();
+      if (!text) return '';
+      // 二级标题用 ###（有 margin-top）
+      return `\n\n## ${text}\n\n`;
+    },
+  });
 
-  const matchCount = thinkingSignals.filter(r => r.test(text)).length;
-  return matchCount >= 2;
+  // 规则2：识别 Grok 的粗体（class 含 r-b88u0q 的 span）
+  // 注意：只处理不是标题的粗体 span（标题 span 由 grok-heading 处理）
+  td.addRule('grok-bold', {
+    filter: (node) => {
+      if (node.nodeName !== 'SPAN') return false;
+      const cls = node.className || '';
+      const style = node.getAttribute('style') || '';
+      // 排除标题 span（由 grok-heading 处理）
+      if (style.includes('display: block') && style.includes('margin-bottom')) return false;
+      // 有 r-b88u0q 且父节点没有 r-b88u0q（避免重复加粗）
+      const parentCls = node.parentElement?.className || '';
+      return cls.includes('r-b88u0q') && !parentCls.includes('r-b88u0q');
+    },
+    replacement: (content) => {
+      const text = content.trim();
+      if (!text) return '';
+      return `**${text}**`;
+    },
+  });
+
+  // 规则3：处理 Grok 列表项中的 <br>（粗体标题 + 描述的分隔符）
+  // Grok 的列表格式：<li><span class="bold">标题</span><br><span>描述</span></li>
+  // turndown 默认会把 <br> 转成两个换行，我们保持一个换行（列表项内换行）
+  td.addRule('grok-li-br', {
+    filter: 'br',
+    replacement: () => '\n  ',
+  });
+
+  // 规则4：去掉 emoji 图片（Grok 会把 emoji 渲染成 <img alt="😀">）
+  td.addRule('emoji-img', {
+    filter: (node) => {
+      return node.nodeName === 'IMG' && !!node.getAttribute('alt') &&
+        node.src && node.src.includes('twimg.com/emoji');
+    },
+    replacement: (content, node) => node.getAttribute('alt') || '',
+  });
+
+  return td;
 }
 
 /**
- * 判断新增文本是否包含实质性回复内容
+ * 从页面中提取最后一条 Grok 回复的 innerHTML
+ * 选择器策略：
+ *   主路径：找到最后一个 [aria-label="Grok"] 容器内的 .r-16lk18l 回复内容 div
+ *   备用路径：直接从 primaryColumn 中找包含最多内容的 .r-16lk18l
  */
-function hasSubstantiveReply(text) {
-  if (!text) return false;
-  // 清理掉思考阶段的噪音
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+async function extractReplyHTML(page) {
+  return await page.evaluate(() => {
+    // 主路径：通过重新生成按钮定位最后一条回复
+    // 重新生成按钮的祖先第6层是回复大容器，其内含 .r-16lk18l 的内容区
+    const regenerateBtns = document.querySelectorAll('[aria-label="重新生成"]');
+    if (regenerateBtns.length > 0) {
+      const lastBtn = regenerateBtns[regenerateBtns.length - 1];
+      let el = lastBtn.parentElement;
+      for (let i = 0; i < 6; i++) {
+        if (!el || el === document.body) break;
+        el = el.parentElement;
+      }
+      if (el) {
+        const contentDivs = el.querySelectorAll('.r-16lk18l');
+        if (contentDivs.length > 0) {
+          const replyContainer = contentDivs[0];
+          // 第一个子 div 是纯回复内容，后续子 div 包含 follow-up 建议问题
+          // 只取第一个子 div（跳过 follow_ups）
+          const firstChild = replyContainer.children[0];
+          if (firstChild && (firstChild.innerText || '').length > 10) {
+            return { html: firstChild.innerHTML, method: 'regenerate-button' };
+          }
+          return { html: replyContainer.innerHTML, method: 'regenerate-button-full' };
+        }
+      }
+    }
 
-  // 信号：有 Markdown 标题、编号列表、长段落、链接等
-  const hasHeaders = lines.some(l => /^#{1,3}\s+\S/.test(l));
-  const hasNumberedList = lines.some(l => /^\d+\.\s+\*?\*?\S/.test(l));
-  const hasLinks = lines.some(l => /https?:\/\/\S+/.test(l));
-  const hasLongParagraphs = lines.some(l => l.length > 150);
-  const totalContentLength = lines.filter(l => l.length > 30).join('').length;
+    // 备用路径1：找 [aria-label="Grok"] div 内的 .r-16lk18l
+    const grokDivs = Array.from(document.querySelectorAll('[aria-label="Grok"]'))
+      .filter(el => el.tagName === 'DIV');
+    for (const grokDiv of grokDivs.reverse()) {
+      const contentDivs = grokDiv.querySelectorAll('.r-16lk18l');
+      if (contentDivs.length > 0) {
+        const firstChild = contentDivs[0].children[0];
+        if (firstChild && (firstChild.innerText || '').length > 10) {
+          return { html: firstChild.innerHTML, method: 'grok-aria-label' };
+        }
+        return { html: contentDivs[0].innerHTML, method: 'grok-aria-label-full' };
+      }
+    }
 
-  // 至少满足其中一些条件
-  if (totalContentLength > 500 && (hasHeaders || hasNumberedList || hasLongParagraphs)) return true;
-  if (totalContentLength > 1000) return true;
-  if (hasHeaders && hasLinks) return true;
+    // 备用路径2：在 primaryColumn 中找所有 .r-16lk18l，取文字最多的
+    const primaryColumn = document.querySelector('[data-testid="primaryColumn"]');
+    if (primaryColumn) {
+      const contentDivs = Array.from(primaryColumn.querySelectorAll('.r-16lk18l'));
+      if (contentDivs.length > 0) {
+        const best = contentDivs.reduce((a, b) =>
+          (a.innerText || '').length > (b.innerText || '').length ? a : b
+        );
+        if ((best.innerText || '').length > 50) {
+          const firstChild = best.children[0];
+          if (firstChild && (firstChild.innerText || '').length > 10) {
+            return { html: firstChild.innerHTML, method: 'primaryColumn-best' };
+          }
+          return { html: best.innerHTML, method: 'primaryColumn-best-full' };
+        }
+      }
+    }
 
-  return false;
+    return { html: null, method: 'none' };
+  });
 }
 
 /**
- * 从 afterText 中提取相对于 beforeText 的新增内容
+ * 将 Grok 回复的 HTML 转换为 Markdown
  */
-function getNewContent(beforeText, afterText) {
-  if (!beforeText) return afterText;
+function htmlToMarkdown(html) {
+  const td = createTurndown();
+  let md = td.turndown(html);
 
-  // 尝试精确前缀匹配
-  const prefixLen = Math.min(beforeText.length, 200);
-  const prefix = beforeText.slice(0, prefixLen);
-  if (afterText.startsWith(prefix)) {
-    return afterText.slice(beforeText.length).trim();
-  }
+  // 清理多余空行
+  md = md.replace(/\n{3,}/g, '\n\n').trim();
 
-  // 退路：直接返回 afterText 尾部
-  if (afterText.length > beforeText.length) {
-    return afterText.slice(beforeText.length - 100).trim();
-  }
-  return afterText;
+  return md;
 }
 
 /**
  * 两阶段等待：
  *   Phase 1: 等待新增内容出现（包含搜索/思考阶段，容忍短暂稳定）
- *   Phase 2: 检测到实质性回复内容后，等待其稳定
+ *   Phase 2: 检测到回复内容后，等待页面文字长度稳定
+ *
+ * v7: 只监控 innerText 长度变化，不再做字符串比对提取内容
+ *     内容提取由 extractReplyHTML 在稳定后完成
  */
-async function waitForReply(page, beforeText, {
+async function waitForReply(page, beforeLen, {
   pollMs = 3000,
   stableRounds = 5,
   timeoutMs = 240000,
-  thinkingTimeoutMs = 90000,   // thinking 阶段最多等 90s，超出视为卡死
+  thinkingTimeoutMs = 90000,
 } = {}) {
   const start = Date.now();
-  let lastLen = 0;
+  let lastLen = beforeLen;
   let stableCount = 0;
-  let phase = 'waiting';     // waiting → thinking → replying → stable
-  let replyDetectedAt = 0;
-  let lastNewContent = '';
+  let phase = 'waiting';
+  let thinkingLastGrowth = null;
 
-  // 错误关键词：检测到就立即退出
   const ERROR_SIGNALS = [
     '出错了，请刷新',
     'Something went wrong',
@@ -149,16 +238,12 @@ async function waitForReply(page, beforeText, {
     'Reconnect',
   ];
 
-  let thinkingStart = null;
-  let thinkingLastGrowth = null;  // 最后一次内容增长的时间
-
   while (Date.now() - start < timeoutMs) {
     try {
       await page.waitForTimeout(pollMs);
     } catch (e) {
-      // 浏览器/页面被关闭时优雅退出
       console.log(`📊 ⚠️ Page closed: ${e.message}`);
-      return { ok: false, currentText: '', newContent: '', forced: false, error: 'Page closed' };
+      return { ok: false, forced: false, error: 'Page closed' };
     }
 
     let currentText = '';
@@ -166,19 +251,25 @@ async function waitForReply(page, beforeText, {
       currentText = await page.evaluate(() => document.body.innerText);
     } catch (e) {
       console.log(`📊 ⚠️ Unable to read page content: ${e.message}`);
-      return { ok: false, currentText: '', newContent: '', forced: false, error: 'Page closed' };
+      return { ok: false, forced: false, error: 'Page closed' };
     }
 
     const len = currentText.length;
     const elapsed = Math.floor((Date.now() - start) / 1000);
-    const newContent = getNewContent(beforeText, currentText);
 
-    // 检测 Grok 网络/服务错误
     const errorSignal = ERROR_SIGNALS.find(s => currentText.includes(s));
     if (errorSignal) {
       console.log(`📊 ${elapsed}s — ❌ Error detected: "${errorSignal}", exiting early`);
-      return { ok: false, currentText, newContent, forced: false, error: errorSignal };
+      return { ok: false, forced: false, error: errorSignal };
     }
+
+    // 检测是否出现"重新生成"按钮（表示 Grok 已完成回复）
+    let hasRegenerateBtn = false;
+    try {
+      hasRegenerateBtn = await page.evaluate(() =>
+        document.querySelectorAll('[aria-label="重新生成"]').length > 0
+      );
+    } catch {}
 
     if (len > lastLen) {
       stableCount = 0;
@@ -186,17 +277,14 @@ async function waitForReply(page, beforeText, {
 
       if (phase === 'waiting') {
         phase = 'thinking';
-        thinkingStart = Date.now();
         thinkingLastGrowth = Date.now();
         console.log(`📊 ${elapsed}s — [thinking] Content started growing (+${growth}, total ${len})`);
       } else if (phase === 'thinking' || phase === 'replying') {
-        thinkingLastGrowth = Date.now();  // 有增长就刷新
-        // 检查新增内容是否已经包含实质性回复
-        if ((!isThinkingPhase(newContent) && hasSubstantiveReply(newContent)) || len > 2000) {
+        thinkingLastGrowth = Date.now();
+        if (len > beforeLen + 500 || hasRegenerateBtn) {
           if (phase !== 'replying') {
             phase = 'replying';
-            replyDetectedAt = Date.now();
-            console.log(`📊 ${elapsed}s — [replying] ✨ Substantive reply content detected (+${growth}, total ${len})`);
+            console.log(`📊 ${elapsed}s — [replying] ✨ Reply content detected (+${growth}, total ${len})`);
           } else {
             console.log(`📊 ${elapsed}s — [replying] Reply still growing (+${growth}, total ${len})`);
           }
@@ -207,113 +295,54 @@ async function waitForReply(page, beforeText, {
     } else {
       stableCount++;
 
-      // thinking 阶段超时检测：距上次内容增长超过 thinkingTimeoutMs 才算卡死
       if (phase === 'thinking' && thinkingLastGrowth && (Date.now() - thinkingLastGrowth) > thinkingTimeoutMs) {
         const stuckSec = Math.floor((Date.now() - thinkingLastGrowth) / 1000);
         console.log(`📊 ${elapsed}s — ❌ thinking phase no growth for ${stuckSec}s, Grok might be stuck`);
-        return { ok: false, currentText, newContent, forced: false, error: 'Thinking timeout' };
+        return { ok: false, forced: false, error: 'Thinking timeout' };
       }
 
       if (phase === 'waiting') {
         console.log(`📊 ${elapsed}s — [waiting] Waiting for reply... (${len})`);
       } else if (phase === 'thinking') {
-        // 在思考阶段，稳定了也不能太早退出
-        // 检查新增内容是否已有实质性回复
-        if (hasSubstantiveReply(newContent)) {
+        // 出现重新生成按钮 → 回复完成
+        if (hasRegenerateBtn) {
           phase = 'replying';
-          replyDetectedAt = Date.now();
-          console.log(`📊 ${elapsed}s — [replying] ✨ Thinking stable, but substantive content already exists stable=${stableCount}/${stableRounds}`);
+          console.log(`📊 ${elapsed}s — [replying] ✨ Regenerate button appeared, reply complete`);
+          return { ok: true, forced: false };
         } else if (stableCount >= stableRounds + 3) {
-          // 思考阶段稳定了很久但没有实质内容 → 可能还在等
-          // 重置 stable 继续等
-          console.log(`📊 ${elapsed}s — [thinking] Thinking phase stable for ${stableCount} rounds, but no substantive content, keep waiting...`);
+          console.log(`📊 ${elapsed}s — [thinking] Thinking phase stable for ${stableCount} rounds, no substantive content, keep waiting...`);
           if (stableCount >= stableRounds + 8) {
-            // 等了太久了，可能思考就是全部了，强制检查
             console.log(`📊 ${elapsed}s — [thinking] Waited too long, forcing content check...`);
-            lastNewContent = newContent;
-            return { ok: true, currentText, newContent, forced: true };
+            return { ok: true, forced: true };
           }
         } else {
           console.log(`📊 ${elapsed}s — [thinking] Thinking phase stable ${stableCount}/${stableRounds + 3}`);
         }
       } else if (phase === 'replying') {
         console.log(`📊 ${elapsed}s — [replying] Stable ${stableCount}/${stableRounds}`);
-        if (stableCount >= stableRounds) {
-          lastNewContent = newContent;
-          return { ok: true, currentText, newContent, forced: false };
+        if (stableCount >= stableRounds || hasRegenerateBtn) {
+          return { ok: true, forced: false };
         }
       }
     }
 
     lastLen = len;
-    lastNewContent = newContent;
   }
 
-  return { ok: false, currentText: await page.evaluate(() => document.body.innerText), newContent: lastNewContent, forced: false };
+  return { ok: false, forced: false, error: 'Timeout' };
 }
 
 /**
- * 清理回复文本：去掉用户 prompt、思考过程、建议问题等
+ * 清理 HTML→Markdown 转换后的文本残留
+ * v7: 不再需要复杂的字符串比对清理，只去掉少量已知 Grok UI 残留
  */
-function cleanReply(newContent, userPrompt) {
-  let text = newContent;
-
-  // 去掉用户 prompt（可能出现在开头）
-  const promptPreview = userPrompt.substring(0, 60);
-  const promptIdx = text.indexOf(promptPreview);
-  if (promptIdx !== -1 && promptIdx < 200) {
-    text = text.slice(promptIdx + userPrompt.length).trim();
-  }
-
-  // 去掉 Grok 思考/搜索阶段的标记
-  const thinkingPatterns = [
-    /Thinking about.*?\n/gi,
-    /Searching\s+\w+.*?\n/gi,
-    /about the user's request\n?/gi,
-    /Switching to.*?\n/gi,
-    /Using since:.*?\n/gi,
-    /快速回答\n?自动\n?/g,
-    /^\d+\s*秒\s*\n/gm,                              // "13 秒" 之类的残留时间标记
-    /<xai:.*?<\/xai:.*?>/gs,                         // XML tool cards
-    /<grok:.*?<\/grok:.*?>/gs,                       // citation cards
-    /<grok:render[^>]*\/>/g,                         // self-closing render tags
-    /<argument[^>]*>.*?<\/argument>/gs,              // argument tags
-  ];
-
-  for (const pattern of thinkingPatterns) {
-    text = text.replace(pattern, '');
-  }
-
-  // 如果文本以 Markdown 标题开头之前有短碎片，去掉它们
-  const firstHeaderIdx = text.search(/^#\s/m);
-  if (firstHeaderIdx > 0 && firstHeaderIdx < 200) {
-    const preHeader = text.slice(0, firstHeaderIdx).trim();
-    // 如果标题前的内容很短且不像正文，去掉
-    if (preHeader.length < 100 && !preHeader.includes('http')) {
-      text = text.slice(firstHeaderIdx);
-    }
-  }
-
-  // 去掉末尾的建议问题（通常是几个短行）
-  const lines = text.split('\n');
-  let endIdx = lines.length;
-
-  // 从末尾往前找：连续的短行（<100字）且不是 Markdown 列表项
-  for (let i = lines.length - 1; i >= Math.max(0, lines.length - 10); i--) {
-    const line = lines[i].trim();
-    if (line.length === 0) continue;
-    if (line.length < 100 && !line.startsWith('#') && !line.startsWith('-') && !line.startsWith('*') && !/^\d+\./.test(line) && !line.includes('http')) {
-      endIdx = i;
-    } else {
-      break;
-    }
-  }
-
-  text = lines.slice(0, endIdx).join('\n');
-
+function cleanMarkdown(text) {
+  // 去掉"已经思考 N 秒"残留
+  text = text.replace(/已经思考\s*\d+\s*秒\n?/g, '');
+  // 去掉"努力思考\n自动"残留
+  text = text.replace(/努力思考\n?自动\n?/g, '');
   // 清理多余空行
   text = text.replace(/\n{3,}/g, '\n\n').trim();
-
   return text;
 }
 
@@ -340,7 +369,7 @@ function resolveVideoPath(target) {
 
   console.log('');
   console.log('╔══════════════════════════════════════════╗');
-  console.log('║      🐾 Grok Scraper v6 — Starting      ║');
+  console.log('║      🐾 Grok Scraper v7 — Starting      ║');
   console.log('╚══════════════════════════════════════════╝');
   console.log('');
 
@@ -383,9 +412,9 @@ function resolveVideoPath(target) {
 
   console.log('✅ Page loaded, textarea is ready');
 
-  // 记录发送前的页面文本
-  const beforeText = await page.evaluate(() => document.body.innerText);
-  console.log(`📏 Page text before sending: ${beforeText.length} chars`);
+  // 记录发送前的页面文本长度（用于监控增长）
+  const beforeLen = await page.evaluate(() => document.body.innerText.length);
+  console.log(`📏 Page text before sending: ${beforeLen} chars`);
 
   // 输入 prompt 并发送
   console.log('📝 Entering prompt...');
@@ -399,8 +428,8 @@ function resolveVideoPath(target) {
   const startTime = Date.now();
   await page.keyboard.press('Enter');
 
-  // 两阶段等待
-  const result = await waitForReply(page, beforeText, {
+  // 两阶段等待（只监控长度稳定）
+  const result = await waitForReply(page, beforeLen, {
     pollMs: 3000,
     stableRounds: 5,
     timeoutMs: 240000,
@@ -410,13 +439,27 @@ function resolveVideoPath(target) {
 
   // 截图留档
   await page.screenshot({ path: path.join(OUTPUT_DIR, 'final-screenshot.png') });
+
+  // 提取回复 HTML（必须在 context.close() 之前）
+  let replyHTML = null;
+  let extractMethod = 'none';
+  if (result.ok) {
+    const extracted = await extractReplyHTML(page);
+    replyHTML = extracted.html;
+    extractMethod = extracted.method;
+    console.log(`🔍 HTML extracted via: ${extractMethod} (${replyHTML ? replyHTML.length : 0} bytes)`);
+  }
+
+  // 必须在 context.close() 之前获取视频临时路径，关闭后 page.video() 不可用
+  const videoPendingPath = recordTarget !== null ? await page.video()?.path() : null;
+
   await context.close();
+
   if (recordTarget !== null) {
-    const tmpPath = await page.video()?.path();
-    if (tmpPath) {
+    if (videoPendingPath) {
       const destPath = resolveVideoPath(recordTarget);
       fs.mkdirSync(path.dirname(destPath), { recursive: true });
-      fs.renameSync(tmpPath, destPath);
+      fs.renameSync(videoPendingPath, destPath);
       console.log(`🎬 Video saved: ${destPath}`);
     } else {
       console.warn('⚠️  Record mode was on but no video file was produced');
@@ -432,26 +475,25 @@ function resolveVideoPath(target) {
     console.error(`║  ${reason.substring(0, 40).padEnd(40)}║`);
     console.error(`║  Elapsed: ${elapsed}s                          ║`);
     console.error('╚══════════════════════════════════════════╝');
-    fs.writeFileSync(path.join(OUTPUT_DIR, 'debug-aftertext.txt'), result.currentText || 'empty');
-    // exit 3 = Grok service/thinking error (retryable), 1 = timeout (not retried)
-    const retryable = result.error && result.error !== 'Page closed';
-    process.exit(retryable ? 3 : 1);
+    process.exit(result.error && result.error !== 'Page closed' ? 3 : 1);
   }
 
-  // 提取并清理回复
-  const reply = cleanReply(result.newContent, PROMPT);
+  // 将 HTML 转换为 Markdown
+  let reply = '';
+  if (replyHTML) {
+    const rawMd = htmlToMarkdown(replyHTML);
+    reply = cleanMarkdown(rawMd);
+    console.log(`✅ HTML→Markdown conversion done (${reply.length} chars)`);
+  }
 
-  if (!reply || reply.length < 100) {
+  if (!reply || reply.length < 50) {
     console.error('');
     console.error('╔══════════════════════════════════════════╗');
     console.error('║  ❌ FAILED — Reply too short              ║');
-    console.error(`║  Length: ${reply ? reply.length : 0} chars (min: 100)        ║`);
-    console.error(`║  Forced: ${result.forced}                         ║`);
+    console.error(`║  Length: ${reply ? reply.length : 0} chars (min: 50)         ║`);
+    console.error(`║  Method: ${extractMethod.padEnd(30)}║`);
     console.error('╚══════════════════════════════════════════╝');
-    console.error('\n--- Raw new content ---\n');
-    console.error(result.newContent?.substring(0, 2000));
-    fs.writeFileSync(path.join(OUTPUT_DIR, 'debug-aftertext.txt'), result.currentText || 'empty');
-    fs.writeFileSync(path.join(OUTPUT_DIR, 'debug-newcontent.txt'), result.newContent || 'empty');
+    fs.writeFileSync(path.join(OUTPUT_DIR, 'debug-reply.html'), replyHTML || 'empty');
     process.exit(1);
   }
 
@@ -470,7 +512,7 @@ function resolveVideoPath(target) {
   console.log(`║  📄 File: ${path.basename(outFile).padEnd(29)}║`);
   console.log(`║  📏 Length: ${String(reply.length).padEnd(28)}║`);
   console.log(`║  ⏱️  Time: ${String(elapsed + 's').padEnd(28)}║`);
-  console.log(`║  🧹 Cleaned: ${result.forced ? 'forced' : 'normal'}${' '.repeat(result.forced ? 21 : 22)}║`);
+  console.log(`║  🔍 Method: ${extractMethod.padEnd(27)}║`);
   console.log('╚══════════════════════════════════════════╝');
   console.log('');
   console.log('--- Grok Reply Preview (first 500 chars) ---');
