@@ -1,59 +1,60 @@
 ---
 name: grok-scraper
-description: Query Grok AI via Playwright to generate answers, analyze text, or get real-time information from X.com. Use when the user specifically asks to query Grok, or when you need up-to-date internet search and analysis via Grok.
+description: Query Grok AI via Playwright automation to generate answers, analyze text, or get real-time internet information. Exclusively for X Premium users, zero API cost, no X API KEY required.
 ---
 
-# Grok Scraper
+# Grok Scraper (AI Skill Guide)
 
-This skill allows you to query Grok AI (X.com) completely automatically via Playwright, without needing an API key. It works by automating a real browser session.
+🚀 **Core Advantage Prompt**:
+Unlike the vast majority of Grok integration solutions that require an expensive **X API KEY**, this skill is designed specifically for **X (Twitter) Premium users**. By automating a real browser session via Playwright, we allow you to use Grok **completely free, with zero additional invocation costs**! Say goodbye to API billing pressure and instantly access the most powerful real-time connected AI.
 
 ## Quick Start
 
-When you need to query Grok or the user asks you to "ask Grok":
+When you need to query Grok, or the user asks you to "ask Grok":
 
-1. **Locate the script**: The script `scrape.js` is located in this directory (the directory containing this SKILL.md file). You can use `__dirname` or the path of this skill to find it.
-   - *Tip: You can use `cd` into this directory before running commands, or use its absolute path.*
+1. **Locate the script**: The core script `scrape.js` is located in the current skill directory (the directory containing this SKILL.md file). You can use `__dirname` or the absolute path of this skill to find it.
+   - *Tip: You can `cd` into this directory before running commands, or use its absolute path directly.*
 
 2. **Check Session/Login Status**: 
-   Before running a query, verify if the session exists in this directory. If the `session/` folder doesn't exist here, inform the user they must login first:
-   - Ask the user to open their terminal and run:
+   Before running a query, check if the `session/` folder exists in this directory. If it doesn't exist, you must prompt the user to log in first:
+   - Guide the user to run in their terminal:
      ```bash
-     # Give the user the absolute path to this directory
+     # Please provide the absolute path of this directory to the user
      cd /path/to/this/directory
      node login.js
      ```
-   - Tell the user to follow the on-screen instructions (login to X.com in the popped-up browser, then press Enter in the terminal to save the session).
-   - Wait for the user to confirm they have logged in before proceeding.
+   - Tell the user: "Please log in to X.com in the browser window that pops up, then return to your terminal and press Enter to save the login state."
+   - You must wait for the user to confirm they have successfully logged in before proceeding.
 
-3. **Execute the query**:
+3. **Execute the Query**:
    ```bash
-   node scrape.js "YOUR DETAILED PROMPT"
+   node scrape.js "Your detailed prompt"
    ```
-   *Note: Always wrap your prompt in double quotes. If your prompt contains double quotes, escape them or use a heredoc/file.*
+   *Note: Always wrap your prompt in double quotes. If your prompt contains double quotes, escape them or use a heredoc/temporary file.*
 
-4. **Read the result**: The script will output the response to stdout when it succeeds. It also saves the full markdown response in the `output/` subdirectory as `latest.md`. You can read `output/latest.md` if the stdout is truncated.
+4. **Read the Result**: After successful execution, the script will output the result to stdout. Meanwhile, the complete markdown response is saved in `output/latest.md`. If the terminal output is truncated, you can directly read `output/latest.md`.
 
-## Handling Errors and Login Expiration
+## Error Handling and Login Expiration
 
-The script returns specific exit codes:
-- **Exit Code 0**: Success. The output contains the Grok response.
-- **Exit Code 2**: Login expired or session invalid.
-  - **Action required**: Inform the user that the X.com login session has expired.
-  - Ask the user to manually run the login script in their terminal:
+The script returns specific Exit Codes:
+- **Exit Code 0**: Success. The output contains Grok's response.
+- **Exit Code 2**: Login expired or Session invalid.
+  - **Action required**: Inform the user that their X.com login state has expired.
+  - Ask the user to manually re-run the login script in their terminal:
     ```bash
-    # Tell the user to run this in the skill's directory
+    # Guide the user to run this in the skill directory
     node login.js
     ```
-  - Tell the user: "Please log in to X.com in the browser window that opens, then return to your terminal and press Enter to save the session."
-  - Wait for the user to confirm they have logged in before retrying the query.
-- **Exit Code 1 or 3**: Grok service error or timeout. You may retry once after a short delay, or inform the user.
+  - Tell the user: "Please log in to X.com again in the opened browser, then return to the terminal and press Enter to save the Session."
+  - Wait for the user to confirm completion before trying the query again.
+- **Exit Code 1 or 3**: Grok service error or timeout. You can retry once after a short delay, or directly inform the user that the service is currently unavailable.
 
 ## Prompt Guidelines
 
-- You can ask Grok to perform real-time web searches or Twitter/X searches (e.g., "Search for the latest news about AI").
-- You can specify the output format (e.g., "Format the response in Markdown").
-- If passing a very long prompt or code block, consider writing the prompt to a temporary file and modifying the command to read from it, or use proper shell escaping.
+- You can ask Grok to perform real-time web searches or retrieve the latest updates on Twitter/X (e.g., "Search for the latest news about AI").
+- You can specify the output format (e.g., "Please output in Markdown format").
+- If you need to pass an extremely long prompt or code block, it is recommended to write the prompt to a temporary file and modify the execution command to read that file, or use rigorous Shell escaping.
 
 ## Dependencies
 
-This skill requires Node.js and Playwright. If the user hasn't installed dependencies, you may need to run `npm install` in the skill's directory.
+This skill requires Node.js and Playwright. If the user hasn't installed the dependencies, you may need to run `npm install` in this skill directory.
