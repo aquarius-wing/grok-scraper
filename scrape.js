@@ -134,7 +134,7 @@ async function waitForReply(page, beforeText, {
       await page.waitForTimeout(pollMs);
     } catch (e) {
       // 浏览器/页面被关闭时优雅退出
-      console.log(`📊 ⚠️ 页面已关闭: ${e.message}`);
+      console.log(`📊 ⚠️ Page closed: ${e.message}`);
       return { ok: false, currentText: '', newContent: '', forced: false, error: 'Page closed' };
     }
 
@@ -142,7 +142,7 @@ async function waitForReply(page, beforeText, {
     try {
       currentText = await page.evaluate(() => document.body.innerText);
     } catch (e) {
-      console.log(`📊 ⚠️ 无法读取页面内容: ${e.message}`);
+      console.log(`📊 ⚠️ Unable to read page content: ${e.message}`);
       return { ok: false, currentText: '', newContent: '', forced: false, error: 'Page closed' };
     }
 
@@ -153,7 +153,7 @@ async function waitForReply(page, beforeText, {
     // 检测 Grok 网络/服务错误
     const errorSignal = ERROR_SIGNALS.find(s => currentText.includes(s));
     if (errorSignal) {
-      console.log(`📊 ${elapsed}s — ❌ 检测到错误提示："${errorSignal}"，提前退出`);
+      console.log(`📊 ${elapsed}s — ❌ Error detected: "${errorSignal}", exiting early`);
       return { ok: false, currentText, newContent, forced: false, error: errorSignal };
     }
 
@@ -165,7 +165,7 @@ async function waitForReply(page, beforeText, {
         phase = 'thinking';
         thinkingStart = Date.now();
         thinkingLastGrowth = Date.now();
-        console.log(`📊 ${elapsed}s — [thinking] 内容开始增长 (+${growth}, total ${len})`);
+        console.log(`📊 ${elapsed}s — [thinking] Content started growing (+${growth}, total ${len})`);
       } else if (phase === 'thinking' || phase === 'replying') {
         thinkingLastGrowth = Date.now();  // 有增长就刷新
         // 检查新增内容是否已经包含实质性回复
@@ -173,12 +173,12 @@ async function waitForReply(page, beforeText, {
           if (phase !== 'replying') {
             phase = 'replying';
             replyDetectedAt = Date.now();
-            console.log(`📊 ${elapsed}s — [replying] ✨ 检测到实质性回复内容 (+${growth}, total ${len})`);
+            console.log(`📊 ${elapsed}s — [replying] ✨ Substantive reply content detected (+${growth}, total ${len})`);
           } else {
-            console.log(`📊 ${elapsed}s — [replying] 回复仍在增长 (+${growth}, total ${len})`);
+            console.log(`📊 ${elapsed}s — [replying] Reply still growing (+${growth}, total ${len})`);
           }
         } else {
-          console.log(`📊 ${elapsed}s — [thinking] 内容增长中 (+${growth}, total ${len})`);
+          console.log(`📊 ${elapsed}s — [thinking] Content growing (+${growth}, total ${len})`);
         }
       }
     } else {
@@ -187,34 +187,34 @@ async function waitForReply(page, beforeText, {
       // thinking 阶段超时检测：距上次内容增长超过 thinkingTimeoutMs 才算卡死
       if (phase === 'thinking' && thinkingLastGrowth && (Date.now() - thinkingLastGrowth) > thinkingTimeoutMs) {
         const stuckSec = Math.floor((Date.now() - thinkingLastGrowth) / 1000);
-        console.log(`📊 ${elapsed}s — ❌ thinking 阶段 ${stuckSec}s 无增长，Grok 可能卡死`);
+        console.log(`📊 ${elapsed}s — ❌ thinking phase no growth for ${stuckSec}s, Grok might be stuck`);
         return { ok: false, currentText, newContent, forced: false, error: 'Thinking timeout' };
       }
 
       if (phase === 'waiting') {
-        console.log(`📊 ${elapsed}s — [waiting] 等待回复... (${len})`);
+        console.log(`📊 ${elapsed}s — [waiting] Waiting for reply... (${len})`);
       } else if (phase === 'thinking') {
         // 在思考阶段，稳定了也不能太早退出
         // 检查新增内容是否已有实质性回复
         if (hasSubstantiveReply(newContent)) {
           phase = 'replying';
           replyDetectedAt = Date.now();
-          console.log(`📊 ${elapsed}s — [replying] ✨ 思考稳定，但已有实质内容 stable=${stableCount}/${stableRounds}`);
+          console.log(`📊 ${elapsed}s — [replying] ✨ Thinking stable, but substantive content already exists stable=${stableCount}/${stableRounds}`);
         } else if (stableCount >= stableRounds + 3) {
           // 思考阶段稳定了很久但没有实质内容 → 可能还在等
           // 重置 stable 继续等
-          console.log(`📊 ${elapsed}s — [thinking] 思考阶段稳定 ${stableCount} 轮，但无实质内容，继续等待...`);
+          console.log(`📊 ${elapsed}s — [thinking] Thinking phase stable for ${stableCount} rounds, but no substantive content, keep waiting...`);
           if (stableCount >= stableRounds + 8) {
             // 等了太久了，可能思考就是全部了，强制检查
-            console.log(`📊 ${elapsed}s — [thinking] 等待过久，强制检查内容...`);
+            console.log(`📊 ${elapsed}s — [thinking] Waited too long, forcing content check...`);
             lastNewContent = newContent;
             return { ok: true, currentText, newContent, forced: true };
           }
         } else {
-          console.log(`📊 ${elapsed}s — [thinking] 思考阶段稳定 ${stableCount}/${stableRounds + 3}`);
+          console.log(`📊 ${elapsed}s — [thinking] Thinking phase stable ${stableCount}/${stableRounds + 3}`);
         }
       } else if (phase === 'replying') {
-        console.log(`📊 ${elapsed}s — [replying] 稳定 ${stableCount}/${stableRounds}`);
+        console.log(`📊 ${elapsed}s — [replying] Stable ${stableCount}/${stableRounds}`);
         if (stableCount >= stableRounds) {
           lastNewContent = newContent;
           return { ok: true, currentText, newContent, forced: false };
@@ -297,7 +297,7 @@ function cleanReply(newContent, userPrompt) {
 // ========== MAIN ==========
 (async () => {
   if (!fs.existsSync(SESSION_DIR)) {
-    console.error('❌ Session 不存在，请先运行: node login.js');
+    console.error('❌ Session does not exist, please run: node login.js first');
     process.exit(2);
   }
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -308,7 +308,7 @@ function cleanReply(newContent, userPrompt) {
   console.log('╚══════════════════════════════════════════╝');
   console.log('');
 
-  console.log('🐾 启动浏览器...');
+  console.log('🐾 Starting browser...');
   const context = await chromium.launchPersistentContext(SESSION_DIR, {
     headless: true,
     args: ['--disable-blink-features=AutomationControlled', '--no-sandbox'],
@@ -317,7 +317,7 @@ function cleanReply(newContent, userPrompt) {
 
   const page = context.pages()[0] || await context.newPage();
 
-  console.log('🌐 打开 Grok...');
+  console.log('🌐 Opening Grok...');
   await page.goto('https://x.com/i/grok', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
   try {
@@ -332,27 +332,27 @@ function cleanReply(newContent, userPrompt) {
       await context.close();
       process.exit(2);
     }
-    console.error('❌ 页面加载异常，URL:', page.url());
+    console.error('❌ Page load error, URL:', page.url());
     await page.screenshot({ path: path.join(OUTPUT_DIR, 'error-screenshot.png') });
     await context.close();
     process.exit(1);
   }
 
-  console.log('✅ 页面已加载，textarea 可用');
+  console.log('✅ Page loaded, textarea is ready');
 
   // 记录发送前的页面文本
   const beforeText = await page.evaluate(() => document.body.innerText);
-  console.log(`📏 发送前页面文本: ${beforeText.length} chars`);
+  console.log(`📏 Page text before sending: ${beforeText.length} chars`);
 
   // 输入 prompt 并发送
-  console.log('📝 输入 prompt...');
+  console.log('📝 Entering prompt...');
   const textarea = page.locator('textarea').first();
   await textarea.click();
   await page.waitForTimeout(500);
   await textarea.fill(PROMPT);
   await page.waitForTimeout(500);
 
-  console.log('📤 发送 prompt，等待 Grok 回复...');
+  console.log('📤 Prompt sent, waiting for Grok reply...');
   const startTime = Date.now();
   await page.keyboard.press('Enter');
 
@@ -368,7 +368,7 @@ function cleanReply(newContent, userPrompt) {
   // 截图留档
   await page.screenshot({ path: path.join(OUTPUT_DIR, 'final-screenshot.png') });
   await context.close();
-  console.log(`🔒 浏览器已关闭 (${elapsed}s)`);
+  console.log(`🔒 Browser closed (${elapsed}s)`);
 
   if (!result.ok) {
     const reason = result.error ? `Grok error: ${result.error}` : 'Timeout waiting for reply';
@@ -424,7 +424,7 @@ function cleanReply(newContent, userPrompt) {
   console.log(reply.substring(0, 500));
   if (reply.length > 500) console.log('\n... (truncated)');
   console.log('');
-  console.log('🐾 完成喵～');
+  console.log('🐾 Done!');
 
   process.exit(0);
 })();

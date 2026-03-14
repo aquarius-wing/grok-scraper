@@ -19,14 +19,14 @@ const OUTPUT_DIR = path.join(__dirname, 'output');
 
   const page = context.pages()[0] || await context.newPage();
 
-  console.log('🌐 打开 Grok...');
+  console.log('🌐 Opening Grok...');
   await page.goto('https://x.com/i/grok', {
     waitUntil: 'domcontentloaded',
     timeout: 30000,
   });
 
   await page.waitForSelector('textarea', { timeout: 30000, state: 'visible' });
-  console.log('✅ 页面已加载');
+  console.log('✅ Page loaded');
 
   // 发一条简单消息
   const textarea = page.locator('textarea').first();
@@ -35,10 +35,10 @@ const OUTPUT_DIR = path.join(__dirname, 'output');
   await textarea.fill('What is 2+2? Answer in one sentence.');
   await page.waitForTimeout(500);
   await page.keyboard.press('Enter');
-  console.log('📤 已发送测试消息');
+  console.log('📤 Test message sent');
 
   // 等待回复（简单问题应该很快）
-  console.log('⏳ 等待回复...');
+  console.log('⏳ Waiting for reply...');
   await page.waitForTimeout(15000);
 
   await page.screenshot({ path: path.join(OUTPUT_DIR, 'debug-reply.png') });
@@ -89,7 +89,7 @@ const OUTPUT_DIR = path.join(__dirname, 'output');
     return results.slice(0, 30);
   });
 
-  console.log('\n📊 DOM 元素（按文本长度排序）:\n');
+  console.log('\n📊 DOM elements (sorted by text length):\n');
   for (const item of domInfo) {
     console.log(`[${item.textLength} chars] ${item.selector}`);
     console.log(`  parent: ${item.parentSelector}`);
@@ -130,8 +130,8 @@ const OUTPUT_DIR = path.join(__dirname, 'output');
   });
 
   fs.writeFileSync(path.join(OUTPUT_DIR, 'debug-dom.txt'), chatHTML, 'utf-8');
-  console.log('\n📁 完整 DOM 结构已保存到 output/debug-dom.txt');
+  console.log('\n📁 Full DOM structure saved to output/debug-dom.txt');
 
   await context.close();
-  console.log('🔒 完成');
+  console.log('🔒 Done');
 })();

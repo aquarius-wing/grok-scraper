@@ -9,10 +9,10 @@ const path = require('path');
 const SESSION_DIR = path.join(__dirname, 'session');
 
 (async () => {
-  console.log('🐾 启动浏览器，请在打开的窗口中登录 x.com ...');
-  console.log('📂 Session 将保存到:', SESSION_DIR);
+  console.log('🐾 Starting browser, please log in to x.com in the opened window...');
+  console.log('📂 Session will be saved to:', SESSION_DIR);
   console.log('');
-  console.log('✅ 登录完成后，在终端按 Enter 保存 session 并关闭浏览器。');
+  console.log('✅ After logging in, press Enter in the terminal to save the session and close the browser.');
   console.log('');
 
   const context = await chromium.launchPersistentContext(SESSION_DIR, {
@@ -32,8 +32,8 @@ const SESSION_DIR = path.join(__dirname, 'session');
     process.stdin.once('data', resolve);
   });
 
-  console.log('💾 正在保存 session...');
+  console.log('💾 Saving session...');
   await context.close();
-  console.log('✅ Session 已保存！可以运行 node scrape.js 测试了喵～');
+  console.log('✅ Session saved! You can now run node scrape.js to test meow~');
   process.exit(0);
 })();
