@@ -35,4 +35,5 @@ const SESSION_DIR = path.join(__dirname, 'session');
   console.log('💾 正在保存 session...');
   await context.close();
   console.log('✅ Session 已保存！可以运行 node scrape.js 测试了喵～');
+  process.exit(0);
 })();
