@@ -3,10 +3,11 @@
 # 用法: ./run.sh [自定义prompt]
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-LOG_FILE="$SCRIPT_DIR/output/run.log"
-NOTIFY_FILE="$SCRIPT_DIR/output/notify-login-expired"
+ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+LOG_FILE="$ROOT_DIR/output/run.log"
+NOTIFY_FILE="$ROOT_DIR/output/notify-login-expired"
 
-mkdir -p "$SCRIPT_DIR/output"
+mkdir -p "$ROOT_DIR/output"
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') — 开始执行 Grok 抓取" >> "$LOG_FILE"
 

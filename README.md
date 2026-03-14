@@ -23,32 +23,36 @@ This project is built exclusively for **X (Twitter) Premium users**! Through Pla
 
 ```text
 grok-scraper/
-├── login.js       # First login: Launches the browser for manual login
-├── scrape.js      # Core script: Sends prompts and scrapes responses
-├── run.sh         # Cron job entry point (with session expiration detection)
-├── session/       # Browser session data (auto-generated after login)
-└── output/        # Scraped results
-    ├── latest.md  # The most recent result
-    └── grok-*.md  # Historical results (named by timestamp)
+├── SKILL.md              # Core Agent instructions
+├── README.md             # Human-readable documentation
+├── package.json
+├── scripts/              # All executable scripts
+│   ├── login.js          # First login: Launches the browser for manual login
+│   ├── scrape.js         # Core script: Sends prompts and scrapes responses
+│   └── run.sh            # Cron job entry point
+├── session/              # Browser session data (auto-generated after login)
+└── output/               # Scraped results
+    ├── latest.md         # The most recent result
+    └── grok-*.md         # Historical results (named by timestamp)
 ```
 
 ## 🚀 Usage Guide
 
 ### 1. First Login
 ```bash
-node login.js
+node scripts/login.js
 # Log in to x.com in the opened browser
 # Return to the terminal and press Enter after logging in
 ```
 
 ### 2. Test Scraping
 ```bash
-node scrape.js
+node scripts/scrape.js
 ```
 
 ### 3. Custom Prompt
 ```bash
-node scrape.js "Your custom question"
+node scripts/scrape.js "Your custom question"
 ```
 
 ### 4. Scheduled Execution

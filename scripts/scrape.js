@@ -18,8 +18,8 @@ const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
 
-const SESSION_DIR = path.join(__dirname, 'session');
-const OUTPUT_DIR = path.join(__dirname, 'output');
+const SESSION_DIR = path.join(__dirname, '..', 'session');
+const OUTPUT_DIR = path.join(__dirname, '..', 'output');
 
 const DEFAULT_PROMPT = `What are the top AI hot topics and trending discussions on Twitter/X in the past 24 hours? Search in English. For each topic, provide:
 1. A brief summary

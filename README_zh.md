@@ -23,32 +23,36 @@
 
 ```text
 grok-scraper/
-├── login.js       # 首次登录：启动浏览器进行手动登录
-├── scrape.js      # 核心脚本：发送提示词并抓取回复
-├── run.sh         # Cron 定时任务入口（包含会话过期检测）
-├── session/       # 浏览器会话数据（登录后自动生成）
-└── output/        # 抓取结果
-    ├── latest.md  # 最新结果
-    └── grok-*.md  # 历史结果（按时间戳命名）
+├── SKILL.md              # 核心 Agent 指令
+├── README.md             # 面向人类的说明
+├── package.json
+├── scripts/              # 集中存放所有执行脚本
+│   ├── login.js          # 首次登录：启动浏览器进行手动登录
+│   ├── scrape.js         # 核心脚本：发送提示词并抓取回复
+│   └── run.sh            # Cron 定时任务入口
+├── session/              # 浏览器会话数据（登录后自动生成）
+└── output/               # 抓取结果
+    ├── latest.md         # 最新结果
+    └── grok-*.md         # 历史结果（按时间戳命名）
 ```
 
 ## 🚀 使用指南
 
 ### 1. 首次登录
 ```bash
-node login.js
+node scripts/login.js
 # 在打开的浏览器中登录 x.com
 # 登录完成后返回终端并按回车键
 ```
 
 ### 2. 测试抓取
 ```bash
-node scrape.js
+node scripts/scrape.js
 ```
 
 ### 3. 自定义提示词
 ```bash
-node scrape.js "你的自定义问题"
+node scripts/scrape.js "你的自定义问题"
 ```
 
 ### 4. 定时执行

@@ -5,8 +5,8 @@ const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
 
-const SESSION_DIR = path.join(__dirname, 'session');
-const OUTPUT_DIR = path.join(__dirname, 'output');
+const SESSION_DIR = path.join(__dirname, '..', 'session');
+const OUTPUT_DIR = path.join(__dirname, '..', 'output');
 
 (async () => {
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });

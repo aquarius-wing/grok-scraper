@@ -6,7 +6,7 @@
 const { chromium } = require('playwright');
 const path = require('path');
 
-const SESSION_DIR = path.join(__dirname, 'session');
+const SESSION_DIR = path.join(__dirname, '..', 'session');
 
 (async () => {
   console.log('🐾 Starting browser, please log in to x.com in the opened window...');

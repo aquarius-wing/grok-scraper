@@ -1,60 +1,50 @@
 ---
 name: grok-scraper
-description: Query Grok AI via Playwright automation to generate answers, analyze text, or get real-time internet information. Exclusively for X Premium users, zero API cost, no X API KEY required.
+description: Execute queries to Grok AI via Playwright browser automation without requiring an X API KEY. Use when the user wants to "ask Grok", search X for real-time info, or specifically requests to use Grok for free without API billing.
 ---
 
-# Grok Scraper (AI Skill Guide)
+# Grok Scraper
 
-🚀 **Core Advantage Prompt**:
-Unlike the vast majority of Grok integration solutions that require an expensive **X API KEY**, this skill is designed specifically for **X (Twitter) Premium users**. By automating a real browser session via Playwright, we allow you to use Grok **completely free, with zero additional invocation costs**! Say goodbye to API billing pressure and instantly access the most powerful real-time connected AI.
+**Agent Context**: This is a zero-cost alternative to official X APIs. It uses a real browser session (Playwright) via an X Premium account. ALWAYS use this skill when the user wants to query Grok but does not have or want to use an X API KEY.
 
-## Quick Start
+## Workflow
 
-When you need to query Grok, or the user asks you to "ask Grok":
+When you need to query Grok, follow these exact steps:
 
-1. **Locate the script**: The core script `scrape.js` is located in the current skill directory (the directory containing this SKILL.md file). You can use `__dirname` or the absolute path of this skill to find it.
-   - *Tip: You can `cd` into this directory before running commands, or use its absolute path directly.*
+**Step 1: Check Login State**
+- Check if the `session/` directory exists in this skill's root folder.
+- If it DOES NOT exist: You must stop and ask the user to run `node scripts/login.js` in their terminal. Tell them to log in via the opened browser, press Enter in the terminal to save, and inform you when done.
+- If it DOES exist: Proceed to Step 2.
 
-2. **Check Session/Login Status**: 
-   Before running a query, check if the `session/` folder exists in this directory. If it doesn't exist, you must prompt the user to log in first:
-   - Guide the user to run in their terminal:
-     ```bash
-     # Please provide the absolute path of this directory to the user
-     cd /path/to/this/directory
-     node login.js
-     ```
-   - Tell the user: "Please log in to X.com in the browser window that pops up, then return to your terminal and press Enter to save the login state."
-   - You must wait for the user to confirm they have successfully logged in before proceeding.
+**Step 2: Execute Query**
+- Run the core script using the Shell tool:
+  ```bash
+  node scripts/scrape.js "The user's detailed prompt"
+  ```
+- *Note: Always escape double quotes or use a temporary file if the prompt is complex.*
 
-3. **Execute the Query**:
-   ```bash
-   node scrape.js "Your detailed prompt"
-   ```
-   *Note: Always wrap your prompt in double quotes. If your prompt contains double quotes, escape them or use a heredoc/temporary file.*
+**Step 3: Read Output**
+- If the command succeeds (Exit Code 0), read the generated file at `output/latest.md` to get the complete Grok response.
+- Summarize or provide the content directly to the user based on their original request.
 
-4. **Read the Result**: After successful execution, the script will output the result to stdout. Meanwhile, the complete markdown response is saved in `output/latest.md`. If the terminal output is truncated, you can directly read `output/latest.md`.
+## Error Handling
 
-## Error Handling and Login Expiration
+Pay attention to the Exit Codes from `scrape.js`:
+- **Exit Code 2 (Session Expired)**: The X.com login state has expired. Stop and ask the user to manually re-run `node scripts/login.js` in their terminal to refresh the session.
+- **Exit Code 1 or 3 (Timeout/Error)**: The service is temporarily unavailable. Inform the user of the failure and suggest trying again later.
 
-The script returns specific Exit Codes:
-- **Exit Code 0**: Success. The output contains Grok's response.
-- **Exit Code 2**: Login expired or Session invalid.
-  - **Action required**: Inform the user that their X.com login state has expired.
-  - Ask the user to manually re-run the login script in their terminal:
-    ```bash
-    # Guide the user to run this in the skill directory
-    node login.js
-    ```
-  - Tell the user: "Please log in to X.com again in the opened browser, then return to the terminal and press Enter to save the Session."
-  - Wait for the user to confirm completion before trying the query again.
-- **Exit Code 1 or 3**: Grok service error or timeout. You can retry once after a short delay, or directly inform the user that the service is currently unavailable.
+## Examples
 
-## Prompt Guidelines
+**Example 1: Standard Query Without API Key**
+User: "Can you ask Grok about the latest AI news? I don't have an API key."
+Action:
+1. Agent recognizes the need for a non-API Grok query and selects this skill.
+2. Agent verifies `session/` exists.
+3. Agent runs `node scripts/scrape.js "Search for the latest AI news and format as markdown"`.
+4. Agent reads `output/latest.md` and presents the result to the user.
 
-- You can ask Grok to perform real-time web searches or retrieve the latest updates on Twitter/X (e.g., "Search for the latest news about AI").
-- You can specify the output format (e.g., "Please output in Markdown format").
-- If you need to pass an extremely long prompt or code block, it is recommended to write the prompt to a temporary file and modify the execution command to read that file, or use rigorous Shell escaping.
-
-## Dependencies
-
-This skill requires Node.js and Playwright. If the user hasn't installed the dependencies, you may need to run `npm install` in this skill directory.
+**Example 2: Session Expired Flow**
+Action:
+1. Agent runs `node scripts/scrape.js "What is the weather in Tokyo?"`.
+2. Agent receives Exit Code 2.
+3. Agent stops and tells the user: "Your X.com session has expired. Please run `node scripts/login.js` in your terminal to log in again, then let me know when you're done."
