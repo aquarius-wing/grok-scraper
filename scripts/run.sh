@@ -11,8 +11,8 @@ mkdir -p "$ROOT_DIR/output"
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') — 开始执行 Grok 抓取" >> "$LOG_FILE"
 
-# 切换到项目根目录执行
-cd "$ROOT_DIR" || exit 1
+# 切换到 scripts 目录执行，因为 package.json 在这里
+cd "$SCRIPT_DIR" || exit 1
 
 # 执行抓取（exit 3 = Grok service error，自动重试一次）
 OUTPUT=$(npm run scrape --silent -- "$@" 2>&1)

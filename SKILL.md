@@ -13,13 +13,13 @@ When you need to query Grok, follow these exact steps:
 
 **Step 1: Check Login State**
 - Check if the `session/` directory exists in this skill's root folder.
-- If it DOES NOT exist: You must stop and ask the user to run `npm run login` in their terminal. Tell them to log in via the opened browser, press Enter in the terminal to save, and inform you when done.
+- If it DOES NOT exist: You must stop and ask the user to run `cd scripts && npm run login` in their terminal. Tell them to log in via the opened browser, press Enter in the terminal to save, and inform you when done.
 - If it DOES exist: Proceed to Step 2.
 
 **Step 2: Execute Query**
 - Run the core script using the Shell tool:
   ```bash
-  npm run scrape -- "The user's detailed prompt"
+  cd scripts && npm run scrape -- "The user's detailed prompt"
   ```
 - *Note: Always escape double quotes or use a temporary file if the prompt is complex.*
 
@@ -30,7 +30,7 @@ When you need to query Grok, follow these exact steps:
 ## Error Handling
 
 Pay attention to the Exit Codes from `scrape.js`:
-- **Exit Code 2 (Session Expired)**: The X.com login state has expired. Stop and ask the user to manually re-run `npm run login` in their terminal to refresh the session.
+- **Exit Code 2 (Session Expired)**: The X.com login state has expired. Stop and ask the user to manually re-run `cd scripts && npm run login` in their terminal to refresh the session.
 - **Exit Code 1 or 3 (Timeout/Error)**: The service is temporarily unavailable. Inform the user of the failure and suggest trying again later.
 
 ## Examples
@@ -40,11 +40,11 @@ User: "Can you ask Grok about the latest AI news? I don't have an API key."
 Action:
 1. Agent recognizes the need for a non-API Grok query and selects this skill.
 2. Agent verifies `session/` exists.
-3. Agent runs `npm run scrape -- "Search for the latest AI news and format as markdown"`.
+3. Agent runs `cd scripts && npm run scrape -- "Search for the latest AI news and format as markdown"`.
 4. Agent reads `output/latest.md` and presents the result to the user.
 
 **Example 2: Session Expired Flow**
 Action:
-1. Agent runs `npm run scrape -- "What is the weather in Tokyo?"`.
+1. Agent runs `cd scripts && npm run scrape -- "What is the weather in Tokyo?"`.
 2. Agent receives Exit Code 2.
-3. Agent stops and tells the user: "Your X.com session has expired. Please run `npm run login` in your terminal to log in again, then let me know when you're done."
+3. Agent stops and tells the user: "Your X.com session has expired. Please run `cd scripts && npm run login` in your terminal to log in again, then let me know when you're done."

@@ -25,8 +25,8 @@
 grok-scraper/
 ├── SKILL.md              # 核心 Agent 指令
 ├── README.md             # 面向人类的说明
-├── package.json
 ├── scripts/              # 集中存放所有执行脚本
+│   ├── package.json      # 依赖与命令配置
 │   ├── login.js          # 首次登录：启动浏览器进行手动登录
 │   ├── scrape.js         # 核心脚本：发送提示词并抓取回复
 │   └── run.sh            # Cron 定时任务入口
@@ -38,8 +38,15 @@ grok-scraper/
 
 ## 🚀 使用指南
 
+### 0. 安装依赖
+```bash
+cd scripts
+npm install
+```
+
 ### 1. 首次登录
 ```bash
+cd scripts
 npm run login
 # 在打开的浏览器中登录 x.com
 # 登录完成后返回终端并按回车键
@@ -47,11 +54,13 @@ npm run login
 
 ### 2. 测试抓取
 ```bash
+cd scripts
 npm run scrape
 ```
 
 ### 3. 自定义提示词
 ```bash
+cd scripts
 npm run scrape -- "你的自定义问题"
 ```
 

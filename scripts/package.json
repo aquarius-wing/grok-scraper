@@ -2,11 +2,11 @@
   "name": "grok-scraper",
   "version": "1.0.0",
   "description": "",
-  "main": "scripts/scrape.js",
+  "main": "scrape.js",
   "scripts": {
-    "login": "node scripts/login.js",
-    "scrape": "node scripts/scrape.js",
-    "start": "bash scripts/run.sh"
+    "login": "node login.js",
+    "scrape": "node scrape.js",
+    "start": "bash run.sh"
   },
   "keywords": [],
   "author": "",

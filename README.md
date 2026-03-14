@@ -25,8 +25,8 @@ This project is built exclusively for **X (Twitter) Premium users**! Through Pla
 grok-scraper/
 ├── SKILL.md              # Core Agent instructions
 ├── README.md             # Human-readable documentation
-├── package.json
 ├── scripts/              # All executable scripts
+│   ├── package.json      # Dependencies and NPM scripts
 │   ├── login.js          # First login: Launches the browser for manual login
 │   ├── scrape.js         # Core script: Sends prompts and scrapes responses
 │   └── run.sh            # Cron job entry point
@@ -38,8 +38,15 @@ grok-scraper/
 
 ## 🚀 Usage Guide
 
+### 0. Install Dependencies
+```bash
+cd scripts
+npm install
+```
+
 ### 1. First Login
 ```bash
+cd scripts
 npm run login
 # Log in to x.com in the opened browser
 # Return to the terminal and press Enter after logging in
@@ -47,11 +54,13 @@ npm run login
 
 ### 2. Test Scraping
 ```bash
+cd scripts
 npm run scrape
 ```
 
 ### 3. Custom Prompt
 ```bash
+cd scripts
 npm run scrape -- "Your custom question"
 ```
 
