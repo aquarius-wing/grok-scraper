@@ -8,8 +8,8 @@
  *   - 清晰的 success/failure 输出
  *
  * 用法:
- *   node scrape.js                    # 默认 prompt
- *   node scrape.js "自定义 prompt"     # 自定义
+ *   npm run scrape                    # 默认 prompt
+ *   npm run scrape -- "自定义 prompt"  # 自定义
  *
  * 退出码: 0=成功, 1=失败, 2=登录失效
  */
@@ -297,7 +297,7 @@ function cleanReply(newContent, userPrompt) {
 // ========== MAIN ==========
 (async () => {
   if (!fs.existsSync(SESSION_DIR)) {
-    console.error('❌ Session does not exist, please run: node login.js first');
+    console.error('❌ Session does not exist, please run: npm run login first');
     process.exit(2);
   }
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -327,7 +327,7 @@ function cleanReply(newContent, userPrompt) {
       console.error('');
       console.error('╔══════════════════════════════════════════╗');
       console.error('║  ❌ FAILED — Login expired               ║');
-      console.error('║  Run: node login.js                      ║');
+      console.error('║  Run: npm run login                      ║');
       console.error('╚══════════════════════════════════════════╝');
       await context.close();
       process.exit(2);

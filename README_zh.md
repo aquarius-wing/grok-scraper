@@ -40,19 +40,19 @@ grok-scraper/
 
 ### 1. 首次登录
 ```bash
-node scripts/login.js
+npm run login
 # 在打开的浏览器中登录 x.com
 # 登录完成后返回终端并按回车键
 ```
 
 ### 2. 测试抓取
 ```bash
-node scripts/scrape.js
+npm run scrape
 ```
 
 ### 3. 自定义提示词
 ```bash
-node scripts/scrape.js "你的自定义问题"
+npm run scrape -- "你的自定义问题"
 ```
 
 ### 4. 定时执行

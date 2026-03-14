@@ -2,9 +2,11 @@
   "name": "grok-scraper",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "scripts/scrape.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "login": "node scripts/login.js",
+    "scrape": "node scripts/scrape.js",
+    "start": "bash scripts/run.sh"
   },
   "keywords": [],
   "author": "",

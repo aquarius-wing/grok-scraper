@@ -34,6 +34,6 @@ const SESSION_DIR = path.join(__dirname, '..', 'session');
 
   console.log('💾 Saving session...');
   await context.close();
-  console.log('✅ Session saved! You can now run node scrape.js to test meow~');
+  console.log('✅ Session saved! You can now run npm run scrape to test meow~');
   process.exit(0);
 })();

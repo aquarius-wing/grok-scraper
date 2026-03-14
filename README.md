@@ -40,19 +40,19 @@ grok-scraper/
 
 ### 1. First Login
 ```bash
-node scripts/login.js
+npm run login
 # Log in to x.com in the opened browser
 # Return to the terminal and press Enter after logging in
 ```
 
 ### 2. Test Scraping
 ```bash
-node scripts/scrape.js
+npm run scrape
 ```
 
 ### 3. Custom Prompt
 ```bash
-node scripts/scrape.js "Your custom question"
+npm run scrape -- "Your custom question"
 ```
 
 ### 4. Scheduled Execution

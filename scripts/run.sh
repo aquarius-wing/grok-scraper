@@ -11,16 +11,18 @@ mkdir -p "$ROOT_DIR/output"
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') — 开始执行 Grok 抓取" >> "$LOG_FILE"
 
+# 切换到项目根目录执行
+cd "$ROOT_DIR" || exit 1
+
 # 执行抓取（exit 3 = Grok service error，自动重试一次）
-cd "$SCRIPT_DIR"
-OUTPUT=$(node scrape.js "$@" 2>&1)
+OUTPUT=$(npm run scrape --silent -- "$@" 2>&1)
 EXIT_CODE=$?
 echo "$OUTPUT" >> "$LOG_FILE"
 
 if [ $EXIT_CODE -eq 3 ]; then
   echo "$(date '+%Y-%m-%d %H:%M:%S') — ⚠️ Grok 服务错误，15s 后重试..." >> "$LOG_FILE"
   sleep 15
-  OUTPUT=$(node scrape.js "$@" 2>&1)
+  OUTPUT=$(npm run scrape --silent -- "$@" 2>&1)
   EXIT_CODE=$?
   echo "$OUTPUT" >> "$LOG_FILE"
 fi
