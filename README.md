@@ -1,5 +1,7 @@
 # Grok Scraper 🐾
 
+[English](./README.md) | [中文](./README_zh.md)
+
 > 🚀 **Break free from API billing shackles and unleash the true potential of Grok AI at zero cost!**
 
 Most X AI (Grok) integration tools on the market require you to apply for and bind an expensive **X API KEY**. Not only is the barrier to entry extremely high, but costs also skyrocket as your conversation volume increases.
