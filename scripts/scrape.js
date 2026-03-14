@@ -28,7 +28,30 @@ const DEFAULT_PROMPT = `What are the top AI hot topics and trending discussions 
 
 Format the response in Markdown.`;
 
-const PROMPT = process.argv[2] || DEFAULT_PROMPT;
+const args = process.argv.slice(2);
+
+// 解析 --record [可选路径] 和 --size WxH，其余参数作为 prompt
+let recordTarget = null;  // null = 不录制；'' = 录制用默认时间戳命名；string = 录制到该路径
+let recordSize = { width: 1280, height: 800 };
+const cleanArgs = [];
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === '--record') {
+    const next = args[i + 1];
+    recordTarget = (next && !next.startsWith('--')) ? (i++, next) : '';
+  } else if (args[i] === '--size') {
+    const next = args[i + 1];
+    if (next && /^\d+x\d+$/i.test(next)) {
+      const [w, h] = next.split('x').map(Number);
+      recordSize = { width: w, height: h };
+      i++;
+    } else {
+      console.warn(`⚠️  Invalid --size value: ${next}, using default 1280x800`);
+    }
+  } else {
+    cleanArgs.push(args[i]);
+  }
+}
+const PROMPT = cleanArgs[0] || DEFAULT_PROMPT;
 
 /**
  * 判断新增文本是否看起来像 Grok 的"思考/搜索"阶段而非最终回复
@@ -294,6 +317,19 @@ function cleanReply(newContent, userPrompt) {
   return text;
 }
 
+/**
+ * 解析视频输出路径：
+ *   - 空字符串 → output/grok-<时间戳>.webm
+ *   - 相对路径或纯文件名 → output/<target>
+ *   - 绝对路径 → 直接使用
+ */
+function resolveVideoPath(target) {
+  const ts = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+  const filename = target || `grok-${ts}.webm`;
+  if (path.isAbsolute(filename)) return filename;
+  return path.join(OUTPUT_DIR, filename);
+}
+
 // ========== MAIN ==========
 (async () => {
   if (!fs.existsSync(SESSION_DIR)) {
@@ -309,10 +345,17 @@ function cleanReply(newContent, userPrompt) {
   console.log('');
 
   console.log('🐾 Starting browser...');
+  if (recordTarget !== null) {
+    console.log(`🎬 Record mode enabled — size: ${recordSize.width}x${recordSize.height}, output: ${resolveVideoPath(recordTarget)}`);
+  }
   const context = await chromium.launchPersistentContext(SESSION_DIR, {
-    headless: true,
+    headless: recordTarget === null,
+    slowMo: recordTarget !== null ? 50 : 0,
     args: ['--disable-blink-features=AutomationControlled', '--no-sandbox'],
-    viewport: { width: 1280, height: 900 },
+    viewport: recordTarget !== null ? recordSize : { width: 1280, height: 900 },
+    ...(recordTarget !== null && {
+      recordVideo: { dir: OUTPUT_DIR, size: recordSize },
+    }),
   });
 
   const page = context.pages()[0] || await context.newPage();
@@ -368,6 +411,17 @@ function cleanReply(newContent, userPrompt) {
   // 截图留档
   await page.screenshot({ path: path.join(OUTPUT_DIR, 'final-screenshot.png') });
   await context.close();
+  if (recordTarget !== null) {
+    const tmpPath = await page.video()?.path();
+    if (tmpPath) {
+      const destPath = resolveVideoPath(recordTarget);
+      fs.mkdirSync(path.dirname(destPath), { recursive: true });
+      fs.renameSync(tmpPath, destPath);
+      console.log(`🎬 Video saved: ${destPath}`);
+    } else {
+      console.warn('⚠️  Record mode was on but no video file was produced');
+    }
+  }
   console.log(`🔒 Browser closed (${elapsed}s)`);
 
   if (!result.ok) {
