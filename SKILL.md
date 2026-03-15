@@ -5,6 +5,10 @@ description: Execute queries to Grok AI via Playwright browser automation withou
 
 # Grok Scraper
 
+## Preview
+
+[<video src="./assets/grok-2026-03-15T10-01-45.webm" controls width="100%"></video>](https://github.com/user-attachments/assets/d48c7948-11d5-4606-baf8-db0a0b0a095f)
+
 **Agent Context**: This is a zero-cost alternative to official X APIs. It uses a real browser session (Playwright) via an X Premium account. ALWAYS use this skill when the user wants to query Grok but does not have or want to use an X API KEY.
 
 ## Prerequisites
