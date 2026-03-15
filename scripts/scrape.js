@@ -23,6 +23,19 @@ const fs = require('fs');
 const SESSION_DIR = path.join(__dirname, '..', 'session');
 const OUTPUT_DIR = path.join(__dirname, '..', 'output');
 
+// ========== 可变选择器（推特发版后可能需要更新） ==========
+// 运行 `npm run inspect` 探查当前 DOM 结构，然后更新此处
+const SELECTORS = {
+  // 回复内容区的 class（从"重新生成"按钮向上 6 层后，在其中搜索此 class）
+  contentClass: 'r-16lk18l',
+  // 粗体 span 的 class
+  boldClass: 'r-b88u0q',
+  // 以下为较稳定的属性选择器（aria-label / data-testid），一般不需修改
+  regenerateBtn: '[aria-label="重新生成"]',
+  primaryColumn: '[data-testid="primaryColumn"]',
+  grokContainer: '[aria-label="Grok"]',
+};
+
 const DEFAULT_PROMPT = `What are the top AI hot topics and trending discussions on Twitter/X in the past 24 hours? Search in English. For each topic, provide:
 1. A brief summary
 2. Why it's trending
@@ -100,7 +113,7 @@ function createTurndown() {
       if (style.includes('display: block') && style.includes('margin-bottom')) return false;
       // 有 r-b88u0q 且父节点没有 r-b88u0q（避免重复加粗）
       const parentCls = node.parentElement?.className || '';
-      return cls.includes('r-b88u0q') && !parentCls.includes('r-b88u0q');
+      return cls.includes(SELECTORS.boldClass) && !parentCls.includes(SELECTORS.boldClass);
     },
     replacement: (content) => {
       const text = content.trim();
@@ -136,10 +149,12 @@ function createTurndown() {
  *   备用路径：直接从 primaryColumn 中找包含最多内容的 .r-16lk18l
  */
 async function extractReplyHTML(page) {
-  return await page.evaluate(() => {
+  return await page.evaluate((sel) => {
+    const contentSelector = '.' + sel.contentClass;
+
     // 主路径：通过重新生成按钮定位最后一条回复
-    // 重新生成按钮的祖先第6层是回复大容器，其内含 .r-16lk18l 的内容区
-    const regenerateBtns = document.querySelectorAll('[aria-label="重新生成"]');
+    // 重新生成按钮的祖先第6层是回复大容器，其内含内容区
+    const regenerateBtns = document.querySelectorAll(sel.regenerateBtn);
     if (regenerateBtns.length > 0) {
       const lastBtn = regenerateBtns[regenerateBtns.length - 1];
       let el = lastBtn.parentElement;
@@ -148,11 +163,9 @@ async function extractReplyHTML(page) {
         el = el.parentElement;
       }
       if (el) {
-        const contentDivs = el.querySelectorAll('.r-16lk18l');
+        const contentDivs = el.querySelectorAll(contentSelector);
         if (contentDivs.length > 0) {
           const replyContainer = contentDivs[0];
-          // 第一个子 div 是纯回复内容，后续子 div 包含 follow-up 建议问题
-          // 只取第一个子 div（跳过 follow_ups）
           const firstChild = replyContainer.children[0];
           if (firstChild && (firstChild.innerText || '').length > 10) {
             return { html: firstChild.innerHTML, method: 'regenerate-button' };
@@ -162,11 +175,11 @@ async function extractReplyHTML(page) {
       }
     }
 
-    // 备用路径1：找 [aria-label="Grok"] div 内的 .r-16lk18l
-    const grokDivs = Array.from(document.querySelectorAll('[aria-label="Grok"]'))
+    // 备用路径1：找 [aria-label="Grok"] div 内的内容区
+    const grokDivs = Array.from(document.querySelectorAll(sel.grokContainer))
       .filter(el => el.tagName === 'DIV');
     for (const grokDiv of grokDivs.reverse()) {
-      const contentDivs = grokDiv.querySelectorAll('.r-16lk18l');
+      const contentDivs = grokDiv.querySelectorAll(contentSelector);
       if (contentDivs.length > 0) {
         const firstChild = contentDivs[0].children[0];
         if (firstChild && (firstChild.innerText || '').length > 10) {
@@ -176,10 +189,10 @@ async function extractReplyHTML(page) {
       }
     }
 
-    // 备用路径2：在 primaryColumn 中找所有 .r-16lk18l，取文字最多的
-    const primaryColumn = document.querySelector('[data-testid="primaryColumn"]');
+    // 备用路径2：在 primaryColumn 中找内容区，取文字最多的
+    const primaryColumn = document.querySelector(sel.primaryColumn);
     if (primaryColumn) {
-      const contentDivs = Array.from(primaryColumn.querySelectorAll('.r-16lk18l'));
+      const contentDivs = Array.from(primaryColumn.querySelectorAll(contentSelector));
       if (contentDivs.length > 0) {
         const best = contentDivs.reduce((a, b) =>
           (a.innerText || '').length > (b.innerText || '').length ? a : b
@@ -195,7 +208,7 @@ async function extractReplyHTML(page) {
     }
 
     return { html: null, method: 'none' };
-  });
+  }, SELECTORS);
 }
 
 /**
@@ -263,11 +276,11 @@ async function waitForReply(page, beforeLen, {
       return { ok: false, forced: false, error: errorSignal };
     }
 
-    // 检测是否出现"重新生成"按钮（表示 Grok 已完成回复）
     let hasRegenerateBtn = false;
     try {
-      hasRegenerateBtn = await page.evaluate(() =>
-        document.querySelectorAll('[aria-label="重新生成"]').length > 0
+      hasRegenerateBtn = await page.evaluate(
+        (sel) => document.querySelectorAll(sel).length > 0,
+        SELECTORS.regenerateBtn
       );
     } catch {}
 
@@ -448,6 +461,36 @@ function resolveVideoPath(target) {
     replyHTML = extracted.html;
     extractMethod = extracted.method;
     console.log(`🔍 HTML extracted via: ${extractMethod} (${replyHTML ? replyHTML.length : 0} bytes)`);
+
+    // 选择器失效时自动输出调试信息（不中断流程，但保存线索）
+    if (!replyHTML || extractMethod === 'none') {
+      console.warn('⚠️  DOM 选择器可能已失效，正在收集调试信息...');
+      try {
+        const debugInfo = await page.evaluate((sel) => {
+          return {
+            timestamp: new Date().toISOString(),
+            url: location.href,
+            bodyTextLen: document.body.innerText.length,
+            regenerateBtn: document.querySelectorAll(sel.regenerateBtn).length,
+            contentClass: document.querySelectorAll('.' + sel.contentClass).length,
+            boldClass: document.querySelectorAll('.' + sel.boldClass).length,
+            primaryColumn: !!document.querySelector(sel.primaryColumn),
+            grokContainer: document.querySelectorAll(sel.grokContainer).length,
+            allTestIds: Array.from(new Set(
+              Array.from(document.querySelectorAll('[data-testid]'))
+                .map(el => el.getAttribute('data-testid'))
+            )),
+            hint: '请运行 npm run inspect 进行详细探查，然后更新 scrape.js 中的 SELECTORS',
+          };
+        }, SELECTORS);
+        const debugFile = path.join(OUTPUT_DIR, 'debug-dom.json');
+        fs.writeFileSync(debugFile, JSON.stringify(debugInfo, null, 2), 'utf-8');
+        console.warn(`📄 调试信息已保存: ${debugFile}`);
+        console.warn('💡 请运行 npm run inspect 进行详细 DOM 探查');
+      } catch (e) {
+        console.warn(`⚠️  无法收集调试信息: ${e.message}`);
+      }
+    }
   }
 
   // 必须在 context.close() 之前获取视频临时路径，关闭后 page.video() 不可用
@@ -493,6 +536,13 @@ function resolveVideoPath(target) {
     console.error(`║  Length: ${reply ? reply.length : 0} chars (min: 50)         ║`);
     console.error(`║  Method: ${extractMethod.padEnd(30)}║`);
     console.error('╚══════════════════════════════════════════╝');
+    if (extractMethod === 'none') {
+      console.error('');
+      console.error('💡 DOM 选择器可能已失效，请执行以下步骤：');
+      console.error('   1. npm run inspect          # 探查当前 DOM 结构');
+      console.error('   2. 对照输出更新 scrape.js 中的 SELECTORS 常量');
+      console.error('   3. 参考 learn/dom-selector-fragility.md 文档');
+    }
     fs.writeFileSync(path.join(OUTPUT_DIR, 'debug-reply.html'), replyHTML || 'empty');
     process.exit(1);
   }
