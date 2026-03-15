@@ -11,6 +11,12 @@ This project is built exclusively for **X (Twitter) Premium users**! Through Pla
 
 ---
 
+## 🎬 Preview
+
+<video src="./assets/grok-2026-03-15T10-01-45.webm" controls width="100%"></video>
+
+---
+
 ## 🌟 Core Advantages
 
 - 💰 **Absolutely Zero Cost**: No need to purchase an X API KEY or pay per token. X Premium users can use it directly for free.

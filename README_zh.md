@@ -11,6 +11,12 @@
 
 ---
 
+## 🎬 预览
+
+<video src="./assets/grok-2026-03-15T10-01-45.webm" controls width="100%"></video>
+
+---
+
 ## 🌟 核心优势
 
 - 💰 **绝对零成本**：无需购买 X API KEY 或按 token 付费。X Premium 用户可以直接免费使用。
