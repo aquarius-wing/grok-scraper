@@ -13,7 +13,7 @@
 
 ## 🎬 预览
 
-<video src="./assets/grok-2026-03-15T10-01-45.webm" controls width="100%"></video>
+[<video src="./assets/grok-2026-03-15T10-01-45.webm" controls width="100%"></video>](https://github.com/user-attachments/assets/d48c7948-11d5-4606-baf8-db0a0b0a095f)
 
 ---
 
