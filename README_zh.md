@@ -25,6 +25,20 @@
 
 ---
 
+## ⚠️ 使用前提
+
+- 主机上必须已安装 **OpenClaw**。
+- 必须通过登录步骤在浏览器中**登录 x.com** 并保存会话。没有有效会话，所有查询都将失败。
+
+| 设备 / 环境 | 是否支持 |
+|---|---|
+| 💻 本地 macOS / Windows / Linux 桌面 | ✅ 完全支持 |
+| 🖥️ 远程桌面（如 VNC、RDP、带 GUI 的云虚拟机） | ✅ 支持 |
+| ☁️ 无屏幕云服务器 / VPS | ❌ 不支持 — 登录步骤需要打开真实浏览器窗口 |
+| 🤖 CI/CD 流水线（如 GitHub Actions 等） | ❌ 不支持 |
+
+---
+
 ## 📦 安装
 
 **作为 OpenClaw Skill 安装：**
@@ -59,6 +73,7 @@ grok-scraper/
 ```bash
 cd scripts
 npm install
+npx playwright install chromium
 ```
 
 ### 1. 首次登录

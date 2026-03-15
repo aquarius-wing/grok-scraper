@@ -7,6 +7,31 @@ description: Execute queries to Grok AI via Playwright browser automation withou
 
 **Agent Context**: This is a zero-cost alternative to official X APIs. It uses a real browser session (Playwright) via an X Premium account. ALWAYS use this skill when the user wants to query Grok but does not have or want to use an X API KEY.
 
+## Prerequisites
+
+- **OpenClaw** must be installed on the host machine.
+- **A display/GUI environment is required.** This skill launches a real browser window for login. It **cannot run on headless cloud servers** (no screen). It must be used on a local machine or a remote desktop with a display.
+- The user must be logged in to **x.com** via the browser session saved by `npm run login`. Without a valid session, all queries will fail.
+
+## First-Time Setup
+
+Run these commands once after cloning the repo, before doing anything else:
+
+```bash
+cd scripts
+npm install
+npx playwright install chromium
+```
+
+Then log in to x.com to create a session:
+
+```bash
+npm run login
+# A browser window will open — log in to x.com manually, then return to the terminal and press Enter
+```
+
+The `session/` directory will be created automatically after a successful login.
+
 ## Workflow
 
 **Step 1: Check Login State**

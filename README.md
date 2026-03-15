@@ -25,6 +25,20 @@ This project is built exclusively for **X (Twitter) Premium users**! Through Pla
 
 ---
 
+## ⚠️ Prerequisites
+
+- **OpenClaw** must be installed on your machine.
+- You must **log in to x.com** through the browser session (see setup below). Without a valid session, queries will fail.
+
+| Device / Environment | Supported? |
+|---|---|
+| 💻 Local macOS / Windows / Linux desktop | ✅ Fully supported |
+| 🖥️ Remote desktop (e.g. VNC, RDP, cloud VM with GUI) | ✅ Supported |
+| ☁️ Headless cloud server / VPS (no screen) | ❌ Not supported — login requires a real browser window |
+| 🤖 CI/CD pipeline (GitHub Actions, etc.) | ❌ Not supported |
+
+---
+
 ## 📦 Installation
 
 **As an OpenClaw Skill:**
@@ -59,6 +73,7 @@ grok-scraper/
 ```bash
 cd scripts
 npm install
+npx playwright install chromium
 ```
 
 ### 1. First Login
