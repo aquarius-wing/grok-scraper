@@ -25,6 +25,15 @@ This project is built exclusively for **X (Twitter) Premium users**! Through Pla
 
 ---
 
+## 📦 Installation
+
+**As an OpenClaw Skill:**
+```bash
+git clone https://github.com/aquarius-wing/grok-scraper.git ~/.openclaw/skills/grok-scraper
+```
+
+---
+
 ## 📁 File Structure
 
 ```text
@@ -41,6 +50,8 @@ grok-scraper/
     ├── latest.md         # The most recent result
     └── grok-*.md         # Historical results (named by timestamp)
 ```
+
+---
 
 ## 🚀 Usage Guide
 

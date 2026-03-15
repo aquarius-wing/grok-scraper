@@ -25,6 +25,15 @@
 
 ---
 
+## 📦 安装
+
+**作为 OpenClaw Skill 安装：**
+```bash
+git clone https://github.com/aquarius-wing/grok-scraper.git ~/.openclaw/skills/grok-scraper
+```
+
+---
+
 ## 📁 文件结构
 
 ```text
@@ -41,6 +50,8 @@ grok-scraper/
     ├── latest.md         # 最新结果
     └── grok-*.md         # 历史结果（按时间戳命名）
 ```
+
+---
 
 ## 🚀 使用指南
 
