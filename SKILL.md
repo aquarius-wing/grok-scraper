@@ -9,42 +9,47 @@ description: Execute queries to Grok AI via Playwright browser automation withou
 
 ## Workflow
 
-When you need to query Grok, follow these exact steps:
-
 **Step 1: Check Login State**
-- Check if the `session/` directory exists in this skill's root folder.
-- If it DOES NOT exist: You must stop and ask the user to run `cd scripts && npm run login` in their terminal. Tell them to log in via the opened browser, press Enter in the terminal to save, and inform you when done.
-- If it DOES exist: Proceed to Step 2.
+- If `session/` directory does not exist: stop and ask the user to run `cd scripts && npm run login`.
+- If it exists: proceed.
 
 **Step 2: Execute Query**
-- Run the core script using the Shell tool:
-  ```bash
-  cd scripts && npm run scrape -- "The user's detailed prompt"
-  ```
-- *Note: Always escape double quotes or use a temporary file if the prompt is complex.*
+```bash
+cd scripts && npm run scrape -- "The user's detailed prompt"
+```
 
 **Step 3: Read Output**
-- If the command succeeds (Exit Code 0), read the generated file at `output/latest.md` to get the complete Grok response.
-- Summarize or provide the content directly to the user based on their original request.
+- Exit Code 0 → read `output/latest.md` and present the result.
+- Other exit codes → see Error Handling below.
 
 ## Error Handling
 
-Pay attention to the Exit Codes from `scrape.js`:
-- **Exit Code 2 (Session Expired)**: The X.com login state has expired. Stop and ask the user to manually re-run `cd scripts && npm run login` in their terminal to refresh the session.
-- **Exit Code 1 or 3 (Timeout/Error)**: The service is temporarily unavailable. Inform the user of the failure and suggest trying again later.
+| Exit Code | Meaning | Action |
+|-----------|---------|--------|
+| 0 | Success | Read `output/latest.md` |
+| 2 | Session expired | Ask user to run `npm run login` |
+| 3 | Grok service error | Retry once after 15s |
+| 1 | Extraction failed | Check if `output/debug-dom.json` was written → if yes, DOM selectors may have broken — see [dom-selector-fix.md](dom-selector-fix.md) |
+
+## DOM Selectors Breaking
+
+Twitter/X redeploys its front-end regularly, which changes the CSS class names this scraper relies on. If extraction fails with `Method: none`, follow the fix guide:
+
+→ **[dom-selector-fix.md](dom-selector-fix.md)**
 
 ## Examples
 
-**Example 1: Standard Query Without API Key**
-User: "Can you ask Grok about the latest AI news? I don't have an API key."
-Action:
-1. Agent recognizes the need for a non-API Grok query and selects this skill.
-2. Agent verifies `session/` exists.
-3. Agent runs `cd scripts && npm run scrape -- "Search for the latest AI news and format as markdown"`.
-4. Agent reads `output/latest.md` and presents the result to the user.
+**Standard query**
+```bash
+cd scripts && npm run scrape -- "Search for the latest AI news and format as markdown"
+# → read output/latest.md
+```
 
-**Example 2: Session Expired Flow**
-Action:
-1. Agent runs `cd scripts && npm run scrape -- "What is the weather in Tokyo?"`.
-2. Agent receives Exit Code 2.
-3. Agent stops and tells the user: "Your X.com session has expired. Please run `cd scripts && npm run login` in your terminal to log in again, then let me know when you're done."
+**Session expired**
+1. Run scrape → Exit Code 2
+2. Tell user: "Session expired, please run `cd scripts && npm run login`"
+
+**DOM selectors broken**
+1. Run scrape → Exit Code 1, `output/debug-dom.json` exists
+2. Follow [dom-selector-fix.md](dom-selector-fix.md) to identify new classes and update `SELECTORS` in `scripts/scrape.js`
+
