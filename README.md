@@ -69,17 +69,26 @@ npm run login
 # Return to the terminal and press Enter after logging in
 ```
 
-### 2. Test Scraping
+### 2. Run a Query
 ```bash
-cd scripts
-npm run scrape
+scripts/run.sh "Your custom question"
+# Result is written to output/latest.md
 ```
 
-### 3. Custom Prompt
+`run.sh` is the canonical entry point. It handles logging to `output/run.log`, automatic retry on Grok service errors, and creates `output/notify-login-expired` when the session expires.
+
+### 3. Scheduled Execution (Cron)
+```bash
+crontab -e
+```
+Add a line to run every 6 hours:
+```
+0 */6 * * * /path/to/grok-scraper/scripts/run.sh "Your scheduled prompt"
+```
+
+### 4. Debugging
+For direct inspection without logging or retry logic:
 ```bash
 cd scripts
 npm run scrape -- "Your custom question"
 ```
-
-### 4. Scheduled Execution
-Cron is configured to run every 6 hours.

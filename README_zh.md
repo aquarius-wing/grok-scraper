@@ -69,17 +69,26 @@ npm run login
 # 登录完成后返回终端并按回车键
 ```
 
-### 2. 测试抓取
+### 2. 执行查询
 ```bash
-cd scripts
-npm run scrape
+scripts/run.sh "你的自定义问题"
+# 结果写入 output/latest.md
 ```
 
-### 3. 自定义提示词
+`run.sh` 是正式入口，负责写入日志到 `output/run.log`、Grok 服务错误时自动重试，以及会话失效时创建 `output/notify-login-expired` 标志文件。
+
+### 3. 定时执行（Cron）
+```bash
+crontab -e
+```
+添加一行，每 6 小时执行一次：
+```
+0 */6 * * * /path/to/grok-scraper/scripts/run.sh "你的定时提示词"
+```
+
+### 4. 调试
+如需绕过日志和重试逻辑直接检查输出：
 ```bash
 cd scripts
 npm run scrape -- "你的自定义问题"
 ```
-
-### 4. 定时执行
-Cron 配置为每 6 小时运行一次。

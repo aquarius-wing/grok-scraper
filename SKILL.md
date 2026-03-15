@@ -15,8 +15,10 @@ description: Execute queries to Grok AI via Playwright browser automation withou
 
 **Step 2: Execute Query**
 ```bash
-cd scripts && npm run scrape -- "The user's detailed prompt"
+scripts/run.sh "The user's detailed prompt"
 ```
+
+`run.sh` handles logging, automatic retry on Grok service errors, and login-expiry detection. It is the canonical entry point for all queries.
 
 **Step 3: Read Output**
 - Exit Code 0 → read `output/latest.md` and present the result.
@@ -27,8 +29,8 @@ cd scripts && npm run scrape -- "The user's detailed prompt"
 | Exit Code | Meaning | Action |
 |-----------|---------|--------|
 | 0 | Success | Read `output/latest.md` |
-| 2 | Session expired | Ask user to run `npm run login` |
-| 3 | Grok service error | Retry once after 15s |
+| 2 | Session expired | Ask user to run `cd scripts && npm run login` |
+| 3 | Grok service error | `run.sh` already retried once; report failure to user |
 | 1 | Extraction failed | Check if `output/debug-dom.json` was written → if yes, DOM selectors may have broken — see [dom-selector-fix.md](dom-selector-fix.md) |
 
 ## DOM Selectors Breaking
@@ -41,15 +43,37 @@ Twitter/X redeploys its front-end regularly, which changes the CSS class names t
 
 **Standard query**
 ```bash
-cd scripts && npm run scrape -- "Search for the latest AI news and format as markdown"
+scripts/run.sh "Search for the latest AI news and format as markdown"
 # → read output/latest.md
 ```
 
 **Session expired**
-1. Run scrape → Exit Code 2
+1. Run `scripts/run.sh` → Exit Code 2
 2. Tell user: "Session expired, please run `cd scripts && npm run login`"
 
 **DOM selectors broken**
-1. Run scrape → Exit Code 1, `output/debug-dom.json` exists
+1. Run `scripts/run.sh` → Exit Code 1, `output/debug-dom.json` exists
 2. Follow [dom-selector-fix.md](dom-selector-fix.md) to identify new classes and update `SELECTORS` in `scripts/scrape.js`
+
+---
+
+## Debugging
+
+When diagnosing scraper issues directly, use the bare command — it skips logging and retry logic, making failures easier to inspect.
+
+| Flag | Example | Description |
+|------|---------|-------------|
+| _(none)_ | `npm run scrape` | Run with default prompt |
+| `"prompt"` | `npm run scrape -- "Your question"` | Custom prompt |
+| `--record` | `npm run scrape -- --record` | Record video to `output/grok-<timestamp>.webm` |
+| `--record <path>` | `npm run scrape -- --record out.webm` | Record video to custom path (relative → `output/`) |
+| `--size WxH` | `npm run scrape -- --record --size 1920x1080` | Set recording resolution (default: `1280x800`) |
+
+All flags can be combined:
+```bash
+cd scripts
+npm run scrape -- "Your prompt" --record --size 1920x1080
+```
+
+When `--record` is active, the browser runs in **headed mode** (visible window) with `slowMo: 50ms`; without it, headless mode is used.
 
